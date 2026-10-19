@@ -47,7 +47,7 @@ flowchart TB
         E --> I
     end
 
-    T(["systemd timers"]) -.-> E
+    T(["Apache Airflow 3 : DAG quotidien"]) -.-> E
     DC[["Docker Compose"]] -.-> E
     V[["Git : code et configuration"]] -.-> DC
 
@@ -74,3 +74,25 @@ flowchart TB
     linkStyle default stroke:#94A3B8,stroke-width:2px,color:#FFFFFF
 
 ```
+
+## État du prototype Airflow
+
+Le schéma ci-dessus représente la cible métier. Le premier palier implémente uniquement
+la collecte RSS et les archives JSON. Le scraping de secours, le stockage métier, le
+regroupement et la publication ne sont pas encore implémentés.
+
+```mermaid
+flowchart LR
+    C[Docker Compose] --> A[API Airflow : localhost 8081]
+    C --> S[Scheduler : LocalExecutor]
+    C --> D[Processeur de DAG]
+    C --> P[(PostgreSQL : métadonnées Airflow)]
+    D --> P
+    S --> P
+    A --> P
+    S --> R[Collecte RSS par source]
+    R --> J[Archives JSON et logs persistants]
+```
+
+Le DAG est programmé à 6 h Europe/Paris et créé en pause. Aucun service de publication
+n'est encore actif. Les archives sont propres à chaque run et remplaçables lors d'un retry.

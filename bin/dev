@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+project_root=$(pwd)
+host_uid=$(id -u)
+host_gid=$(id -g)
+docker build --target app -t gazette-mdja-app:local .
+docker run --rm --user "$host_uid:$host_gid" \
+  --mount "type=bind,source=$project_root,target=/workspace" \
+  --entrypoint python gazette-mdja-app:local /app/infra/bootstrap.py --uid "$host_uid"
+docker compose config --quiet
+docker compose build airflow-init
+docker compose up airflow-init --exit-code-from airflow-init
+docker compose up -d --wait --wait-timeout 240 postgres airflow-api-server airflow-scheduler airflow-dag-processor
+if [ "${GAZETTE_SKIP_COLLECT:-0}" != 1 ]; then
+  docker compose run --rm --no-deps app
+fi
+printf '%s\n' 'Airflow : http://localhost:8081 (ou AIRFLOW_PORT dans .env), utilisateur admin' \
+  'Mot de passe : docker compose exec airflow-api-server cat /opt/airflow/auth/passwords.json'

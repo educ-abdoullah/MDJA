@@ -50,10 +50,10 @@ Le projet ne doit pas seulement fonctionner sur le poste d'un membre du groupe :
 | **Budget zéro** | Priorité aux logiciels libres et à une machine déjà disponible |
 | Respect des éditeurs | Inventaire des conditions dans `sources.csv`, collecte de métadonnées uniquement |
 | Exécution sans surveillance humaine | Planification sur une machine **disponible en continu**, reprises et alertes |
-| Reproductibilité | Code, Dockerfiles, Compose, unités `systemd` et configuration d'installation dans Git |
+| Reproductibilité | Code, Dockerfile, Compose, DAG Airflow et configuration dans Git |
 | Traçabilité | Identifiant d'exécution, provenance des articles, historique de publication |
 
-**Hypothèse critique :** l'équipe disposera d'une machine Linux accessible et suffisamment disponible avant 7 h. Si elle est éteinte ou inaccessible, ni Docker Compose ni `systemd` ne garantissent une publication ponctuelle. L'hébergement reste **à confirmer**.
+**Hypothèse critique :** l'équipe disposera d'une machine Linux accessible et suffisamment disponible avant 7 h. Si elle est éteinte ou inaccessible, ni Docker Compose ni Airflow ne garantissent une publication ponctuelle. L'hébergement reste **à confirmer**.
 
 ## 4. Choix techniques et alternatives
 
@@ -71,16 +71,22 @@ Le projet ne doit pas seulement fonctionner sur le poste d'un membre du groupe :
 
 ### 4.2. Automatisation quotidienne
 
-**Choix : `systemd timers` + Docker Compose.**
+**Choix : Apache Airflow 3 + Docker Compose, avec LocalExecutor pour le prototype.**
 
 | Option | Atouts | Limites / décision |
 |---|---|---|
-| **systemd timers + Docker Compose — retenu** | Planification sur Linux, supervision de service, journaux, conteneurs reproductibles | Dépend de la disponibilité du serveur ; timers, horloge et fuseau à configurer |
-| **Cron — écarté** | Très simple et répandu | Gestion des exécutions manquées et du statut moins intégrée à notre approche |
-| **GitHub Actions planifié — écarté** | Infrastructure distante, configuration YAML, logs intégrés | Démarrage à l'heure non garanti ; dépendance aux limites de la plateforme |
-| **Apache Airflow — écarté** | Orchestration et reprise avancées | Trop lourd à déployer et maintenir pour un pipeline quotidien initial |
+| **Apache Airflow — retenu** | DAG, historique, interface, logs et retries par tâche | Plusieurs services et ressources mémoire à prévoir |
+| **systemd timers — écarté** | Léger, supervision Linux intégrée | Dépendances et reprises par tâche à développer |
+| **Cron — écarté** | Simple et répandu | Historique et suivi des échecs à construire |
+| **GitHub Actions planifié — écarté** | Exécution distante et logs intégrés | Horaire de démarrage non garanti |
 
-**Fonctionnement prévu :** un timer démarre la préparation **avant 7 h** (horaire précis à calibrer après tests). Un contrôle distinct valide la publication à 7 h. En cas d'échec temporaire, relances bornées avec journalisation. La publication utilise une clé unique par date pour éviter les doubles éditions ; la relance manuelle doit être **idempotente**. La propriété `Persistent=true` peut rattraper un timer manqué après redémarrage, mais **ne garantit pas** une édition publiée à 7 h si l'hôte était indisponible.
+**Fonctionnement actuel :** `gazette_daily` lance la collecte à 6 h Europe/Paris,
+avec trois retries par source, un seul run actif et sans rattrapage automatique.
+Airflow pilote les tâches ; Compose déploie les services. PostgreSQL conserve pour
+l'instant les métadonnées Airflow et les articles sont archivés en JSON.
+L'exécuteur local évite Redis et les workers Celery pour ce premier palier.
+La publication unique à 7 h, le stockage métier et le contrôle indépendant sont
+encore à développer. Airflow ne garantit pas à lui seul le respect de cette échéance.
 
 ### 4.3. Stockage et archivage
 
@@ -115,7 +121,7 @@ Le projet ne doit pas seulement fonctionner sur le poste d'un membre du groupe :
 
 ### 4.5. Supervision et contrôle de publication
 
-**Choix : logging Python structuré + contrôle automatique de publication.**
+**Choix : logs par tâche Airflow + événements Python structurés ; contrôle de publication à développer.**
 
 | Option | Atouts | Limites / décision |
 |---|---|---|
@@ -134,17 +140,17 @@ Le projet ne doit pas seulement fonctionner sur le poste d'un membre du groupe :
 
 | Option | Atouts | Limites / décision |
 |---|---|---|
-| **Docker Compose + Git — retenu** | Configuration lisible, versionnée et facile à reproduire sur un hôte | Ne crée pas la machine hôte et ne configure pas `systemd` à lui seul |
+| **Docker Compose + Git — retenu** | Configuration lisible, versionnée et facile à reproduire sur un hôte | Ne crée pas la machine hôte et ne garantit pas sa disponibilité |
 | **Terraform / OpenTofu — écarté initialement** | Provisionnement déclaratif, utile pour le cloud | Complexité disproportionnée tant qu'aucune ressource cloud n'est à créer |
 | **Ansible — complément possible** | Automatisation de la configuration de l'hôte | Ajoute un outil et nécessite des accès d'administration |
 | **Kubernetes — écarté** | Orchestration et montée en charge avancées | Trop lourd pour un service quotidien sur machine unique |
 
-**Fichiers prévus :** `compose.yaml`, `Dockerfile`, `.env.example` (sans secret), scripts d'installation, unités `systemd` et timers versionnés, scripts de migration SQL, `README.md`, fichiers `docs/*.md`. Les mots de passe sont injectés hors Git via variables ou mécanisme de secrets. Toute modification est commitée ; le déploiement est documenté et rejouable.
+**Fichiers :** `docker-compose.yml`, `Dockerfile`, `.env.example` (sans secret), scripts de démarrage et DAG Airflow versionnés, `README.md`, fichiers `docs/*.md`. Le stockage métier et ses migrations SQL restent à développer. Les secrets locaux sont générés dans `.env`, hors Git.
 
 ## 5. Chaîne de traitement cible
 
 ```text
-Timer systemd (préparation avant 7 h)
+DAG Airflow (collecte à 6 h Europe/Paris)
   → Conteneur de collecte (RSS ; repli conditionnel autorisé)
   → Archive brute autorisée + PostgreSQL
   → Normalisation, contrôle de qualité et déduplication
@@ -164,7 +170,7 @@ Infrastructure et configuration versionnées dans Git
 | Flux RSS indisponible ou modifié | Articles manquants | Retries bornés, journalisation par source, autres flux ; secours HTML **uniquement si autorisé** |
 | Conditions de réutilisation non respectées | Problème juridique ou blocage | Vérification des éditeurs, mention des conditions dans `sources.csv`, aucun texte intégral |
 | Dates manquantes ou fuseaux incohérents | Articles trop anciens | Normalisation UTC en base, conversion `Europe/Paris` pour la publication ; rejet/quarantaine des dates invérifiables |
-| Machine arrêtée / timer non déclenché | Gazette absente à 7 h | Hébergement disponible en continu, vérification externe, reprise documentée |
+| Machine arrêtée / scheduler indisponible | Gazette absente à 7 h | Hébergement disponible en continu, vérification externe, reprise documentée |
 | Pipeline trop long | Publication tardive | Mesurer les durées, déclencher avant 7 h, seuil d'alerte |
 | Doublons / répétition après relance | Edition ou article dupliqué | Contraintes SQL, transactions, traitements idempotents |
 | PostgreSQL indisponible ou volume perdu | Perte ou blocage des données | Volumes persistants, sauvegardes testées, procédure de restauration |
@@ -179,7 +185,7 @@ Infrastructure et configuration versionnées dans Git
 | Sujet | Responsable(s) | Livrable attendu |
 |---|---|---|
 | 1. Collecte presse | À attribuer | `sources.csv`, collecteur RSS et politique de secours |
-| 2. Planification | À attribuer | Timers/services `systemd`, procédure de reprise |
+| 2. Planification | À attribuer | DAG Airflow, retries, historique et procédure de reprise |
 | 3. Stockage | À attribuer | Schéma PostgreSQL, archivage, sauvegardes |
 | 4. Regroupement | À attribuer | Comparatif des méthodes, prototype, évaluation |
 | 5. Supervision | À attribuer | Schéma de logs, contrôle de publication et alertes |
@@ -210,4 +216,4 @@ Infrastructure et configuration versionnées dans Git
 
 ---
 
-**Position de l'équipe :** privilégier une solution gratuite, justifiable et maintenable : RSS d'abord, extraction HTML uniquement lorsqu'elle est autorisée, `systemd` et Docker Compose pour l'exécution, PostgreSQL et archives pour la traçabilité, logs structurés et contrôle métier pour la surveillance, Git pour reproduire le déploiement. Les solutions plus lourdes restent possibles si les besoins évoluent, mais ne sont pas nécessaires à ce stade.
+**Position de l'équipe :** RSS d'abord, extraction HTML uniquement lorsqu'elle est autorisée, Airflow et Docker Compose pour l'exécution, PostgreSQL et archives pour la traçabilité, logs structurés et contrôle métier pour la surveillance, Git pour reproduire le déploiement. Ce prototype commence par la collecte RSS ; la chaîne métier complète sera construite progressivement.

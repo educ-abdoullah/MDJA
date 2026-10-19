@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+docker build --target test -t gazette-mdja-test:local .
+docker run --rm gazette-mdja-test:local "$@"
