@@ -1,12 +1,10 @@
 """RSS/Atom : telechargement borne, dates UTC et archives JSON atomiques."""
 
 import calendar
-import csv
 import hashlib
 import json
 import logging
 import os
-import re
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -15,33 +13,16 @@ from urllib.request import Request, urlopen
 
 import feedparser
 
+from gazette.catalogue import read_catalogue
+
 LOGGER = logging.getLogger(__name__)
 MAX_FEED_BYTES = 5 * 1024 * 1024
 
 
 def load_sources(path: Path) -> list[dict[str, str]]:
     """Valider la configuration avant de lancer des requetes."""
-    with path.open(encoding="utf-8-sig", newline="") as stream:
-        reader = csv.DictReader(stream)
-        if not {"source_id", "name", "url", "enabled"}.issubset(reader.fieldnames or []):
-            raise ValueError("Colonnes sources.csv manquantes")
-        sources = []
-        seen = set()
-        for row in reader:
-            if row["enabled"].strip().lower() not in {"true", "false"}:
-                raise ValueError("enabled doit valoir true ou false")
-            if row["enabled"].strip().lower() != "true":
-                continue
-            source_id = row["source_id"].strip()
-            if not re.fullmatch(r"[a-z0-9_-]+", source_id) or source_id in seen:
-                raise ValueError(f"Identifiant de source invalide ou duplique : {source_id}")
-            url = row["url"].strip()
-            if urlparse(url).scheme not in {"http", "https"} or not urlparse(url).hostname:
-                raise ValueError(f"URL HTTP(S) requise : {source_id}")
-            if not row["name"].strip():
-                raise ValueError(f"Nom manquant : {source_id}")
-            seen.add(source_id)
-            sources.append({"source_id": source_id, "name": row["name"].strip(), "url": url})
+    sources = [{"source_id": row["source_id"], "name": row["name"], "url": row["url"]}
+               for row in read_catalogue(path) if row["active"]]
     if not sources:
         raise ValueError("Aucune source active dans sources.csv")
     return sources

@@ -26,6 +26,7 @@ x-airflow-common: &airflow-common
     - ./plugins:/opt/airflow/plugins:ro
     - ./logs:/opt/airflow/logs
     - ./data:/opt/airflow/data
+    - ./articles_bruts:/opt/airflow/articles_bruts
     - airflow-auth:/opt/airflow/auth
 
 services:
@@ -37,10 +38,40 @@ services:
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
       PYTHONPATH: /app/src
+      GAZETTE_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
     volumes:
       - ./sources.csv:/app/sources.csv:ro
       - ./data:/app/data
+      - ./articles_bruts:/app/articles_bruts
+      - ./tests/fixtures:/app/fixtures:ro
+    command: ["--source", "lemonde"]
     profiles: [collect]
+
+  gazette-init:
+    image: gazette-mdja-app:local
+    user: "${AIRFLOW_UID:-50000}:0"
+    entrypoint: ["python", "-m", "gazette.storage"]
+    command: ["--init"]
+    environment:
+      GAZETTE_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
+      GAZETTE_ADMIN_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/postgres
+    volumes:
+      - ./sources.csv:/app/sources.csv:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  storage-tests:
+    image: gazette-mdja-test:local
+    build:
+      context: .
+      target: test
+    environment:
+      TEST_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
+    depends_on:
+      gazette-init:
+        condition: service_completed_successfully
+    profiles: [test]
 
   postgres:
     image: postgres:16.6

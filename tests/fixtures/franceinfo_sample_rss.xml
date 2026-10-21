@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>franceinfo</title>
+    <link>https://www.franceinfo.fr/titres.rss</link>
+    <description>Exemple reel reduit, etape 1</description>
+    <item>
+      <title>Violences du 17 octobre : "Le gouvernement a perdu la maîtrise de tout", accuse Marine Le Pen sur franceinfo</title>
+      <description>La cheffe du Rassemblement national, candidate à la présidentielle, a attaqué l'exécutif sur franceinfo.</description>
+      <pubDate>Wed, 21 Oct 2026 08:50:12 +0200</pubDate>
+      <link>https://www.franceinfo.fr/societe/mobilisation-du-17-octobre/direct-mobilisation-du-17-octobre-sebastien-lecornu-recoit-les-organisations-syndicales-apres-une-nouvelle-nuit-de-couvre-feux_8246746.html#xtor=RSS-3-[lestitres]</link>
+      <guid>https://www.franceinfo.fr/societe/mobilisation-du-17-octobre/direct-mobilisation-du-17-octobre-sebastien-lecornu-recoit-les-organisations-syndicales-apres-une-nouvelle-nuit-de-couvre-feux_8246746.html#xtor=RSS-3-[lestitres]</guid>
+    </item>
+  </channel>
+</rss>

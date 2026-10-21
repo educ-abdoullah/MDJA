@@ -6,6 +6,22 @@ from pathlib import Path
 
 import pendulum
 from airflow.sdk import dag, get_current_context, task
+from airflow.sdk.definitions.retry_policy import RetryDecision, RetryPolicy
+
+from gazette.retries import DELAYED_RETRY_DELAY, MAX_RETRIES, delay_after_failure
+
+
+class GazetteRetryPolicy(RetryPolicy):
+    """Trois reprises immediates, puis huit reprises espacees de 30 minutes."""
+
+    def evaluate(self, exception, try_number, max_tries, context=None):
+        if try_number > MAX_RETRIES:
+            return RetryDecision.fail(reason="Les 11 reprises ont ete epuisees")
+        delay = delay_after_failure(try_number)
+        return RetryDecision.retry(
+            delay=delay,
+            reason=f"Reprise {try_number}/{MAX_RETRIES} apres {int(delay.total_seconds())} s",
+        )
 
 
 @dag(
@@ -15,12 +31,13 @@ from airflow.sdk import dag, get_current_context, task
     start_date=pendulum.datetime(2026, 10, 19, tz="Europe/Paris"),
     catchup=False,
     max_active_runs=1,
-    dagrun_timeout=timedelta(minutes=45),
+    # Deux etapes successives peuvent chacune attendre 4 h et executer 12 tentatives.
+    dagrun_timeout=timedelta(hours=10),
     default_args={
-        "retries": 3,
-        "retry_delay": timedelta(minutes=2),
-        "retry_exponential_backoff": True,
-        "max_retry_delay": timedelta(minutes=5),
+        "retries": MAX_RETRIES,
+        "retry_delay": DELAYED_RETRY_DELAY,
+        "retry_exponential_backoff": False,
+        "retry_policy": GazetteRetryPolicy(),
         "execution_timeout": timedelta(minutes=3),
     },
     tags=["mdja", "rss"],

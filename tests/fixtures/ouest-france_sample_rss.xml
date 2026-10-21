@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>ouest-france</title>
+    <link>https://www.ouest-france.fr/rss/une</link>
+    <description>Exemple reel reduit, etape 1</description>
+    <item>
+      <title>INFOGRAPHIES. Le pouvoir d’achat augmente, pourquoi a-t-on le ressenti qu’il baisse ?</title>
+      <link>https://www.ouest-france.fr/societe/manifestation/infographies-le-pouvoir-dachat-augmente-pourquoi-a-t-on-le-ressenti-quil-baisse-8bb52cd6-cc88-11f1-bf87-17eca79cb13c?utm_source=fluxpublicactu&amp;utm_medium=fluxrss&amp;utm_campaign=banquedecontenu</link>
+      <description>L’une des principales revendications des centaines de milliers de manifestants du samedi 17 octobre 2026 est la lutte contre la vie chère. C’est un paradoxe : ces dernières années, le pouvoir d’achat a augmenté en France et pourtant le ressenti est inverse. On vous explique pourquoi.</description>
+      <pubDate>Wed, 21 Oct 2026 08:16:08 GMT</pubDate>
+      <guid isPermaLink="false">https://www.ouest-france.fr/societe/manifestation/infographies-le-pouvoir-dachat-augmente-pourquoi-a-t-on-le-ressenti-quil-baisse-8bb52cd6-cc88-11f1-bf87-17eca79cb13c?utm_source=fluxpublicactu&amp;utm_medium=fluxrss&amp;utm_campaign=banquedecontenu</guid>
+    </item>
+  </channel>
+</rss>

@@ -12,10 +12,11 @@ tags: []
 5. Ouvrir une pull request décrivant le changement et ses validations ; attendre la CI verte.
 
 Ne pas committer `.env`, données, logs, caches ou mots de passe. Ajouter les sources
-dans `sources.csv` en UTF-8 ; renseigner le flux réel et vérifier les conditions avant
-activation. Conserver une seule source active pour la démonstration initiale.
+dans `sources.csv` en UTF-8 avec le format à points-virgules documenté dans
+`docs/donnees.md`. Les huit sources sont importées ; leur état opérationnel est
+conservé dans PostgreSQL et ne doit pas être réinitialisé à chaque import.
 
-Consigner les incidents et correctifs dans `docs/journal.md`. Toute modification du
+Consigner les incidents et correctifs dans `docs/Archive/journal.md`. Toute modification du
 contrat CSV doit être accompagnée d'un test utilisant le catalogue du dépôt.
 
 ## Montrer qu'un test cassé bloque la CI
@@ -29,6 +30,6 @@ Conserver les deux liens d'exécution dans le journal. Ne pas fusionner la versi
 ## Revue croisée
 
 Une autre équipe clone le dépôt et suit les deux commandes du README sur sa machine.
-Elle remplit `docs/revue-croisee.md` : système, commit, commandes, fichier JSON obtenu,
+Elle remplit `docs/Archive/revue-croisee.md` : système, commit, commandes, fichier JSON obtenu,
 résultat des tests et premier bug rencontré. Nous faisons la même vérification sur
 son dépôt. Cette validation humaine complète les tests automatiques.

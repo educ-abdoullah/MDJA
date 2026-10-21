@@ -2,6 +2,7 @@
 *.py text eol=lf
 *.yml text eol=lf
 *.xml text eol=lf
+*.sql text eol=lf
 Dockerfile text eol=lf
 bin/dev text eol=lf
 bin/test text eol=lf

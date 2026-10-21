@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>liberation</title>
+    <link>https://www.liberation.fr/arc/outboundfeeds/rss-all/?outputType=xml</link>
+    <description>Exemple reel reduit, etape 1</description>
+    <item>
+      <title>Mort de Paul Barril, sulfureux cofondateur du GIGN</title>
+      <link>https://www.liberation.fr/societe/police-justice/mort-de-paul-barril-sulfureux-cofondateur-du-gign-20261021_SLGANK5ZSZCFDLOT4TOCOWU5AM/</link>
+      <guid isPermaLink="true">https://www.liberation.fr/societe/police-justice/mort-de-paul-barril-sulfureux-cofondateur-du-gign-20261021_SLGANK5ZSZCFDLOT4TOCOWU5AM/</guid>
+      <description>L’ancien officier de l’unité d’élite de la gendarmerie nationale est mort mardi à l’âge de 80 ans, a-t-on appris ce mercredi 21 octobre. Il avait notamment été mis en cause dans le cadre du génocide au Rwanda.</description>
+      <pubDate>Wed, 21 Oct 2026 08:12:57 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

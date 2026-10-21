@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>lemonde</title>
+    <link>https://www.lemonde.fr/rss/une.xml</link>
+    <description>Exemple reel reduit, etape 1</description>
+    <item>
+      <title>Mobilisation du 17 octobre : lors des comparutions immédiates, le défilé des auteurs présumés des pillages devant des juges sous pression</title>
+      <pubDate>Wed, 21 Oct 2026 06:51:13 +0200</pubDate>
+      <description>Des dizaines de personnes interpellées lors des pillages, samedi, étaient jugées mardi 20 octobre à Paris, Lyon et Marseille. La plupart ont été condamnées à des peines avec sursis, inférieures aux réquisitions du parquet, témoignant de la fragilité des dossiers.</description>
+      <guid isPermaLink="true">https://www.lemonde.fr/societe/article/2026/10/21/violences-du-17-octobre-aux-comparutions-immediates-des-procedures-fragiles-et-des-juges-sous-pression_6798201_3224.html</guid>
+      <link>https://www.lemonde.fr/societe/article/2026/10/21/violences-du-17-octobre-aux-comparutions-immediates-des-procedures-fragiles-et-des-juges-sous-pression_6798201_3224.html</link>
+    </item>
+  </channel>
+</rss>

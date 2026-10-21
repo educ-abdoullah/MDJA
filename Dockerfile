@@ -7,14 +7,17 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
 WORKDIR /app
 COPY --from=dependencies /wheels /wheels
-RUN pip install --no-cache-dir --no-index --find-links=/wheels feedparser==6.0.11 \
-    && rm -rf /wheels \
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r /tmp/requirements.txt \
+    && rm -rf /wheels /tmp/requirements.txt \
     && groupadd --gid 10001 gazette \
     && useradd --uid 10001 --gid gazette --no-create-home gazette \
-    && mkdir -p /app/data/raw && chown -R gazette:gazette /app/data
+    && mkdir -p /app/data/raw /app/articles_bruts \
+    && chown -R gazette:gazette /app/data /app/articles_bruts
 COPY src ./src
 COPY sources.csv .
 COPY infra/bootstrap.py ./infra/bootstrap.py
+COPY infra/migrations ./infra/migrations
 USER gazette
 ENTRYPOINT ["python", "-m", "gazette"]
 

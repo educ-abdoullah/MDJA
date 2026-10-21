@@ -8,6 +8,7 @@ __pycache__
 .ruff_cache
 .notebook
 data
+articles_bruts
 logs
 Docs
 docs

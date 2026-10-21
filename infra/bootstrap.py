@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("/workspace"))
     parser.add_argument("--uid", default="50000")
     args = parser.parse_args()
-    for directory in ("logs", "plugins", "data", "data/raw"):
+    for directory in ("logs", "plugins", "data", "data/raw", "articles_bruts"):
         path = args.root / directory
         path.mkdir(parents=True, exist_ok=True)
         if os.getuid() == 0:

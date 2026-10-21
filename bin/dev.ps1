@@ -19,6 +19,8 @@ docker compose build airflow-init
 if ($LASTEXITCODE -ne 0) { throw 'Construction Airflow impossible.' }
 docker compose up airflow-init --exit-code-from airflow-init
 if ($LASTEXITCODE -ne 0) { throw 'Initialisation Airflow impossible.' }
+docker compose run --rm gazette-init
+if ($LASTEXITCODE -ne 0) { throw 'Initialisation du stockage metier impossible.' }
 docker compose up -d --wait --wait-timeout 240 postgres airflow-api-server airflow-scheduler airflow-dag-processor
 if ($LASTEXITCODE -ne 0) { throw 'Demarrage incomplet : consulter docker compose logs.' }
 if ($env:GAZETTE_SKIP_COLLECT -ne '1') {

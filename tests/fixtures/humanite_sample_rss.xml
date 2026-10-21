@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>humanite</title>
+    <link>https://www.humanite.fr/feed</link>
+    <description>Exemple reel reduit, etape 1</description>
+    <item>
+      <title>Blessée par un coup au sein gauche : le témoignage d’une victime de violences policières</title>
+      <link>https://www.humanite.fr/societe-2/mouvement-lyceen/blessee-par-un-coup-au-sein-gauche-le-temoignage-dune-victime-de-violences-policieres</link>
+      <pubDate>Wed, 21 Oct 2026 08:08:26 +0000</pubDate>
+      <category>societe</category>
+      <guid isPermaLink="false">https://www.humanite.fr/?p=3926008</guid>
+      <description>"Je me suis pris un coup de matraque, ou de bouclier, dans le sein gauche." Amandine a été victime de violences policières ce 17 octobre au Mans, elle témoigne.</description>
+    </item>
+  </channel>
+</rss>

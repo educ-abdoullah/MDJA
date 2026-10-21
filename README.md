@@ -76,11 +76,11 @@ Pour développer en Python : créer un environnement Python 3.12, installer
 ## Sources et archives
 
 `sources.csv` conserve huit médias, leurs régions et les conditions renseignées par
-l'équipe. Il est encodé en UTF-8, séparé par des virgules, avec les colonnes :
-`source_id,name,type,region,site_url,url,enabled,conditions,notes`.
-`site_url` désigne le site ; `url` désigne le véritable flux RSS/Atom.
-Seul **Le Monde** est actif pour ce premier livrable ; les sept autres flux restent
-à renseigner et vérifier. Le lien de Sud Ouest a été corrigé vers `sudouest.fr`.
+l'équipe. Il est encodé en UTF-8, séparé par des points-virgules, avec les colonnes :
+`Nom;type;region;source;acces;conditions;notes`.
+`source` contient le véritable flux RSS/Atom. Les huit médias sont pris en compte.
+Le diagnostic du 21 octobre constate six flux lisibles, une boucle de redirection
+pour Sud Ouest et un refus 403 pour Le Télégramme. Les URL demandées sont conservées.
 Les conditions conservées sont des notes de l'équipe, pas une validation juridique.
 
 Le parseur garde les titres/liens datés de moins de 24 h à la collecte, rejette les
@@ -94,7 +94,31 @@ Pour relancer la collecte seule :
 docker compose run --rm --no-deps app
 ```
 
+## Stockage brut — étape 2
+
+Le démarrage initialise aussi la base métier `gazette`, distincte de `airflow`, avec
+une table `sources` et un index unique `(source, lien)`. Le nouveau stockage produit
+un JSON par article sous `articles_bruts/`, sans filtre de fraîcheur. Il conserve
+les métadonnées bornées, pas le texte intégral. Le raccordement du collecteur à ce
+stockage et le cycle de 30 minutes restent les prochaines étapes.
+
+```powershell
+docker compose run --rm gazette-init
+docker compose run --rm --entrypoint python app -m gazette.storage --list-sources
+docker compose run --rm --entrypoint python app -m gazette.storage --input fixtures/lemonde_sample_rss.xml --source lemonde
+docker compose run --rm --build storage-tests
+```
+
+Le service `app` utilise Le Monde par défaut pour préserver la démonstration initiale.
+Les champs, migrations, reprises après interruption et limites sont expliqués dans
+[docs/donnees.md](docs/donnees.md). La CI exécute les tests du vrai PostgreSQL.
+
 ## Images et CI
+
+Le DAG prévoit au maximum 12 tentatives par tâche : la première, 3 retries sans délai
+volontaire, puis jusqu'à 8 retries espacés de 30 minutes. Chaque tentative est limitée
+à 3 minutes et le DAG à 10 h, pour laisser les deux étapes successives utiliser leurs
+reprises. Un succès arrête les retries ; les logs indiquent le numéro et le délai choisi.
 
 Le `Dockerfile` principal contient les étapes `dependencies`, `runtime`, `test`, `app`.
 L'image finale ne contient ni Airflow, ni les outils de tests, ni les fichiers de build.
@@ -107,7 +131,7 @@ précédentes ; une pull request construit et teste sans publier d'image.
 L'image vérifiée est transférée entre jobs et publiée sous `ghcr.io/educ-abdoullah/mdja`
 avec les tags `YYYYMMDDTHHMMSSZ-<sha12>` et `sha-<sha-complet>`.
 L'authentification utilise le `GITHUB_TOKEN` du job avec `packages: write`.
-Les résultats effectifs et les liens de preuve sont consignés dans `docs/journal.md`.
+Les résultats effectifs et les liens de preuve sont consignés dans `docs/Archive/journal.md`.
 
 ## Exploitation et contribution
 
@@ -117,9 +141,10 @@ les identifiants. Données et logs restent hors Git. Le poste et Docker doivent 
 actifs pour les exécutions quotidiennes. `GAZETTE_SKIP_COLLECT=1` permet à la CI de
 vérifier la stack sans joindre les médias.
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md), [stratégie CI/CD](docs/ci-cd.md),
-[cadrage](docs/cadrage.md), [architecture](docs/architecture.md), [journal](docs/journal.md)
-et [fiche de revue croisée](docs/revue-croisee.md).
+Voir [CONTRIBUTING.md](CONTRIBUTING.md), [stratégie CI/CD](docs/Archive/ci-cd.md),
+[cadrage](docs/cadrage.md), [architecture](docs/architecture.md),
+[journal](docs/Archive/journal.md), [données](docs/donnees.md)
+et [fiche de revue croisée](docs/Archive/revue-croisee.md).
 
-Le regroupement des thèmes, les synthèses, le stockage métier et la publication de
-la gazette à 7 h restent les prochaines étapes du projet.
+Le raccordement de la collecte au stockage brut, les reprises par source, le cycle
+de 30 minutes, les thèmes, synthèses et publication à 7 h restent les étapes suivantes.
