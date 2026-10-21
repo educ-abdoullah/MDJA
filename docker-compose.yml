@@ -19,6 +19,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     PYTHONPATH: /opt/airflow/src
     GAZETTE_ROOT: /opt/airflow
+    GAZETTE_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
   volumes:
     - ./dags:/opt/airflow/dags:ro
     - ./src:/opt/airflow/src:ro

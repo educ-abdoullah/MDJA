@@ -1,63 +1,51 @@
-"""Premier palier : collecte RSS uniquement, sans publication d'edition."""
+"""Collecte RSS de la Gazette toutes les 30 minutes via PostgreSQL."""
 
+import json
 import os
 from datetime import timedelta
 from pathlib import Path
 
 import pendulum
-from airflow.sdk import dag, get_current_context, task
-from airflow.sdk.definitions.retry_policy import RetryDecision, RetryPolicy
-
-from gazette.retries import DELAYED_RETRY_DELAY, MAX_RETRIES, delay_after_failure
-
-
-class GazetteRetryPolicy(RetryPolicy):
-    """Trois reprises immediates, puis huit reprises espacees de 30 minutes."""
-
-    def evaluate(self, exception, try_number, max_tries, context=None):
-        if try_number > MAX_RETRIES:
-            return RetryDecision.fail(reason="Les 11 reprises ont ete epuisees")
-        delay = delay_after_failure(try_number)
-        return RetryDecision.retry(
-            delay=delay,
-            reason=f"Reprise {try_number}/{MAX_RETRIES} apres {int(delay.total_seconds())} s",
-        )
+from airflow.sdk import dag, task
 
 
 @dag(
     dag_id="gazette_daily",
-    description="Collecte des titres RSS recents en JSON",
-    schedule="0 6 * * *",
-    start_date=pendulum.datetime(2026, 10, 19, tz="Europe/Paris"),
+    description="Collecte RSS multi-sources vers PostgreSQL et articles_bruts",
+    schedule="*/30 * * * *",
+    start_date=pendulum.datetime(2026, 10, 21, tz="Europe/Paris"),
     catchup=False,
     max_active_runs=1,
-    # Deux etapes successives peuvent chacune attendre 4 h et executer 12 tentatives.
-    dagrun_timeout=timedelta(hours=10),
-    default_args={
-        "retries": MAX_RETRIES,
-        "retry_delay": DELAYED_RETRY_DELAY,
-        "retry_exponential_backoff": False,
-        "retry_policy": GazetteRetryPolicy(),
-        "execution_timeout": timedelta(minutes=3),
-    },
-    tags=["mdja", "rss"],
+    dagrun_timeout=timedelta(minutes=28),
+    default_args={"retries": 0},
+    tags=["mdja", "rss", "collecte"],
 )
 def gazette_daily():
-    @task
-    def read_sources():
-        from gazette.collectors.rss import load_sources
+    @task(execution_timeout=timedelta(minutes=25))
+    def collect_rss():
+        from gazette.collectors.rss import collect_active_sources
 
+        database_url = os.environ["GAZETTE_DATABASE_URL"]
         root = Path(os.environ.get("GAZETTE_ROOT", "/opt/airflow"))
-        return load_sources(root / "sources.csv")
+        results = collect_active_sources(database_url, root / "articles_bruts")
+        failures = {source: result for source, result in results.items() if "error" in result}
+        totals = {
+            key: sum(int(result.get(key, 0)) for result in results.values())
+            for key in ("recus", "ecrits", "ignores", "repares")
+        }
+        print(json.dumps({
+            "event": "gazette_cycle_summary",
+            "sources_checked": len(results),
+            "sources_failed": len(failures),
+            "totals": totals,
+            "failures": failures,
+        }, ensure_ascii=False))
+        # Les erreurs propres a une source sont comptabilisees et gerees par le collecteur.
+        # Ne pas lever une exception ici : un retry Airflow compterait un autre cycle.
+        # Seules les erreurs globales/infrastructure doivent faire echouer cette tache.
+        return {"sources_checked": len(results), "sources_failed": len(failures), **totals}
 
-    @task
-    def collect_rss(source):
-        from gazette.collectors.rss import collect_source
-
-        root = Path(os.environ.get("GAZETTE_ROOT", "/opt/airflow"))
-        return collect_source(source, root / "data" / "raw", get_current_context()["run_id"])
-
-    collect_rss.expand(source=read_sources())
+    collect_rss()
 
 
 gazette_daily()
