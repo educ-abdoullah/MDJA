@@ -53,8 +53,10 @@ def migrate(connection):
                     raise ValueError(f"Migration deja appliquee mais modifiee : {path.name}")
                 continue
             cursor.execute(content)
-            cursor.execute("INSERT INTO schema_migrations(version,checksum) VALUES (%s,%s)",
-                           (path.name, checksum))
+            cursor.execute(
+                "INSERT INTO schema_migrations(version,checksum) VALUES (%s,%s)",
+                (path.name, checksum),
+            )
             applied.append(path.name)
     return applied
 
@@ -63,17 +65,26 @@ def sync_sources(connection, catalogue: Path):
     sources = read_catalogue(catalogue)
     with connection, connection.cursor() as cursor:
         for source in sources:
-            cursor.execute("""INSERT INTO sources
+            cursor.execute(
+                """INSERT INTO sources
                 (id,nom,type,region,url_flux,acces,conditions,notes,actif)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (id) DO UPDATE SET
                 nom=EXCLUDED.nom, type=EXCLUDED.type, region=EXCLUDED.region,
                 url_flux=EXCLUDED.url_flux, acces=EXCLUDED.acces,
-                conditions=EXCLUDED.conditions, notes=EXCLUDED.notes""", (
-                source["source_id"], source["name"], source["type"], source["region"],
-                source["url"], source["access"], source["conditions"], source["notes"],
-                source["active"],
-            ))
+                conditions=EXCLUDED.conditions, notes=EXCLUDED.notes""",
+                (
+                    source["source_id"],
+                    source["name"],
+                    source["type"],
+                    source["region"],
+                    source["url"],
+                    source["access"],
+                    source["conditions"],
+                    source["notes"],
+                    source["active"],
+                ),
+            )
     return len(sources)
 
 
@@ -81,7 +92,11 @@ def atomic_json(path: Path, item: dict):
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False,
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            suffix=".tmp",
+            delete=False,
         ) as stream:
             temporary = Path(stream.name)
             json.dump(item, stream, ensure_ascii=False, indent=2)
@@ -101,8 +116,9 @@ def store_items(connection, items: list[dict], output_dir: Path) -> dict:
         for source_id in source_ids:
             if not re.fullmatch(r"[a-z0-9_-]{1,64}", source_id):
                 raise ValueError("Identifiant de source invalide")
-            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
-                           ("gazette-source:" + source_id,))
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtext(%s))", ("gazette-source:" + source_id,)
+            )
             cursor.execute("SELECT 1 FROM sources WHERE id=%s", (source_id,))
             if not cursor.fetchone():
                 raise ValueError(f"Source absente de PostgreSQL : {source_id}")
@@ -113,8 +129,10 @@ def store_items(connection, items: list[dict], output_dir: Path) -> dict:
             directory = output_dir / item["source"]
             directory.mkdir(parents=True, exist_ok=True)
             path = directory / f"{expected_id}.json"
-            cursor.execute("SELECT id FROM articles_bruts_index WHERE source=%s AND lien=%s",
-                           (item["source"], item["lien"]))
+            cursor.execute(
+                "SELECT id FROM articles_bruts_index WHERE source=%s AND lien=%s",
+                (item["source"], item["lien"]),
+            )
             indexed = cursor.fetchone() is not None
             existing = None
             if path.exists():
@@ -123,7 +141,8 @@ def store_items(connection, items: list[dict], output_dir: Path) -> dict:
                 except (ValueError, UnicodeError):
                     pass
             valid_file = (
-                isinstance(existing, dict) and existing.get("id") == expected_id
+                isinstance(existing, dict)
+                and existing.get("id") == expected_id
                 and existing.get("source") == item["source"]
                 and existing.get("lien") == item["lien"]
                 and existing.get("recupere_le")
@@ -135,9 +154,16 @@ def store_items(connection, items: list[dict], output_dir: Path) -> dict:
                 atomic_json(path, item)
                 counts["repares" if indexed else "ecrits"] += 1
                 received = item["recupere_le"]
-            cursor.execute("""INSERT INTO articles_bruts_index(id,source,lien,chemin,recupere_le)
+            cursor.execute(
+                """INSERT INTO articles_bruts_index(id,source,lien,chemin,recupere_le)
                 VALUES (%s,%s,%s,%s,%s) ON CONFLICT (source,lien) DO UPDATE SET
                 chemin=EXCLUDED.chemin,recupere_le=EXCLUDED.recupere_le""",
-                           (expected_id, item["source"], item["lien"],
-                            path.relative_to(output_dir).as_posix(), received))
+                (
+                    expected_id,
+                    item["source"],
+                    item["lien"],
+                    path.relative_to(output_dir).as_posix(),
+                    received,
+                ),
+            )
     return counts

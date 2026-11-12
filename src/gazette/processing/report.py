@@ -3,6 +3,7 @@
 Le rapport décrit l'état courant des décisions qualité (tables reconstruites
 par persist.py) et non l'historique de tous les cycles Airflow.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,12 +39,16 @@ def collect_quality_snapshot(connection, *, generated_at: datetime | None = None
     by_source = []
     for name, raw_count, kept_count, rejected_count in source_rows:
         raw_count, kept_count, rejected_count = map(int, (raw_count, kept_count, rejected_count))
-        by_source.append({
-            "source": name, "entres": raw_count, "gardes": kept_count,
-            "rejetes": rejected_count,
-            "taux_rejet_pct": round(100 * rejected_count / raw_count, 2) if raw_count else None,
-            "non_classes": raw_count - kept_count - rejected_count,
-        })
+        by_source.append(
+            {
+                "source": name,
+                "entres": raw_count,
+                "gardes": kept_count,
+                "rejetes": rejected_count,
+                "taux_rejet_pct": round(100 * rejected_count / raw_count, 2) if raw_count else None,
+                "non_classes": raw_count - kept_count - rejected_count,
+            }
+        )
 
     by_rule = Counter()
     by_source_rule = []
@@ -82,13 +87,17 @@ def render_markdown(snapshot: dict) -> str:
         "",
         "**Périmètre :** état actuel des tables `articles_propres` et `rejets` ; "
         "les articles bruts correspondent à `articles_bruts_index`. "
-        "Ce rapport ne suit pas individuellement les cycles Airflow.",
+        "Chaque traitement réexamine tous les bruts indexés (pas seulement les nouveaux).",
+        f"Run Airflow : {snapshot.get('run_id') or 'exécution hors Airflow'}",
         "",
         "## Bilan global",
         "",
         "| Entrés (bruts indexés) | Conservés | Rejetés | Non classés |",
         "|---:|---:|---:|---:|",
-        f"| {totals['entres']} | {totals['gardes']} | {totals['rejetes']} | {totals['non_classes']} |",
+        (
+            f"| {totals['entres']} | {totals['gardes']} | "
+            f"{totals['rejetes']} | {totals['non_classes']} |"
+        ),
         "",
         "## Par source",
         "",
@@ -97,8 +106,10 @@ def render_markdown(snapshot: dict) -> str:
     ]
     for row in snapshot["par_source"]:
         rate = "N/A" if row["taux_rejet_pct"] is None else f"{row['taux_rejet_pct']:.2f} %"
-        lines.append(f"| {row['source']} | {row['entres']} | {row['gardes']} | "
-                     f"{row['rejetes']} | {rate} | {row['non_classes']} |")
+        lines.append(
+            f"| {row['source']} | {row['entres']} | {row['gardes']} | "
+            f"{row['rejetes']} | {rate} | {row['non_classes']} |"
+        )
 
     lines += ["", "## Rejets par règle", "", "| Règle | Nombre |", "|---|---:|"]
     if snapshot["par_regle"]:
@@ -106,7 +117,13 @@ def render_markdown(snapshot: dict) -> str:
     else:
         lines.append("| Aucun rejet | 0 |")
 
-    lines += ["", "## Rejets par source et par règle", "", "| Source | Règle | Nombre |", "|---|---|---:|"]
+    lines += [
+        "",
+        "## Rejets par source et par règle",
+        "",
+        "| Source | Règle | Nombre |",
+        "|---|---|---:|",
+    ]
     if snapshot["par_source_et_regle"]:
         for item in snapshot["par_source_et_regle"]:
             lines.append(f"| {item['source']} | {item['regle']} | {item['rejetes']} |")
@@ -122,14 +139,18 @@ def render_markdown(snapshot: dict) -> str:
 
     lines += ["", "## Points de vigilance", ""]
     if totals["non_classes"]:
-        lines.append(f"- **Attention :** {totals['non_classes']} article(s) brut(s) "
-                     "sans décision qualité. Relancer le traitement de l'étape 4.")
+        lines.append(
+            f"- **Attention :** {totals['non_classes']} article(s) brut(s) "
+            "sans décision qualité. Relancer le traitement de l'étape 4."
+        )
     else:
         lines.append("- Tous les articles bruts indexés disposent d'une décision qualité.")
     for row in snapshot["par_source"]:
         if row["taux_rejet_pct"] is not None and row["taux_rejet_pct"] > 80:
-            lines.append(f"- **Seuil dépassé :** {row['source']} ({row['taux_rejet_pct']:.2f} % de rejets).")
-    lines += ["", "_Les contrôles automatisés et notifications sont développés à l'étape 6._", ""]
+            lines.append(
+                f"- **Seuil dépassé :** {row['source']} ({row['taux_rejet_pct']:.2f} % de rejets)."
+            )
+    lines += ["", "Les contrôles qualité suivent la génération du rapport dans le DAG.", ""]
     return "\n".join(lines)
 
 
@@ -146,15 +167,27 @@ def write_report(snapshot: dict, output_dir: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Rapport qualité sur les décisions stockées en base")
+    parser = argparse.ArgumentParser(
+        description="Rapport qualité sur les décisions stockées en base"
+    )
     parser.add_argument("--output-dir", default="rapports", type=Path)
     args = parser.parse_args()
     import psycopg2
+
     with closing(psycopg2.connect(os.environ["GAZETTE_DATABASE_URL"], connect_timeout=10)) as conn:
         snapshot = collect_quality_snapshot(conn)
     daily = write_report(snapshot, args.output_dir)
-    print(json.dumps({"rapport": str(daily), "totaux": snapshot["totaux"],
-                      "top_5_rejets": snapshot["top_5_rejets"]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "rapport": str(daily),
+                "totaux": snapshot["totaux"],
+                "top_5_rejets": snapshot["top_5_rejets"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

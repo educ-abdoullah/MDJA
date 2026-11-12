@@ -16,7 +16,9 @@ class QualityReportTests(unittest.TestCase):
             [("franceinfo", "R04_jeux_concours", 1), ("franceinfo", "R05_titre_vide", 1)],
         ]
         snapshot = collect_quality_snapshot(conn, generated_at=datetime(2026, 11, 12, tzinfo=UTC))
-        self.assertEqual(snapshot["totaux"], {"entres": 6, "gardes": 4, "rejetes": 2, "non_classes": 0})
+        self.assertEqual(
+            snapshot["totaux"], {"entres": 6, "gardes": 4, "rejetes": 2, "non_classes": 0}
+        )
         self.assertEqual(snapshot["par_source"][0]["taux_rejet_pct"], 50)
         self.assertEqual(snapshot["top_5_rejets"][0]["nombre"], 1)
         self.assertIn("R04_jeux_concours", render_markdown(snapshot))
@@ -34,7 +36,9 @@ class QualityReportTests(unittest.TestCase):
         conn = MagicMock()
         cur = conn.cursor.return_value.__enter__.return_value
         cur.fetchall.side_effect = [[("franceinfo", 1, 1, 0)], []]
-        snapshot = collect_quality_snapshot(conn, generated_at=datetime(2026, 11, 12, 9, 15, tzinfo=UTC))
+        snapshot = collect_quality_snapshot(
+            conn, generated_at=datetime(2026, 11, 12, 9, 15, tzinfo=UTC)
+        )
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             daily = write_report(snapshot, directory)

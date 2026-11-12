@@ -29,8 +29,14 @@ def main():
     connection = psycopg2.connect(database_url, connect_timeout=10)
     try:
         if args.init:
-            print(json.dumps({"migrations": migrate(connection),
-                              "sources_importees": sync_sources(connection, args.catalogue)}))
+            print(
+                json.dumps(
+                    {
+                        "migrations": migrate(connection),
+                        "sources_importees": sync_sources(connection, args.catalogue),
+                    }
+                )
+            )
         if args.input:
             if not args.source:
                 parser.error("--source est requis avec --input")

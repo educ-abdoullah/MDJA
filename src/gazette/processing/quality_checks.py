@@ -3,6 +3,7 @@
 Aucune modification SQL. Les métriques sont émises en JSON dans les logs :
 Airflow pourra les collecter lors de l'étape 7.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -15,6 +16,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from gazette.processing.report import collect_quality_snapshot
+from gazette.processing.rules import FUTURE_TOLERANCE
 
 LOGGER = logging.getLogger(__name__)
 REJECTION_THRESHOLD_PCT = 80.0
@@ -23,8 +25,13 @@ REJECTION_THRESHOLD_PCT = 80.0
 def read_integrity_counts(connection) -> dict[str, int]:
     """Vérifier les faits sur les données réelles, pas sur des fixtures."""
     checks = {
-        "titres_vides": "SELECT COUNT(*) FROM articles_propres WHERE titre IS NULL OR btrim(titre) = ''",
-        "dates_futures": "SELECT COUNT(*) FROM articles_propres WHERE publie_le > CURRENT_TIMESTAMP",
+        "titres_vides": (
+            "SELECT COUNT(*) FROM articles_propres WHERE titre IS NULL OR btrim(titre) = ''"
+        ),
+        "dates_futures": (
+            "SELECT COUNT(*) FROM articles_propres "
+            "WHERE publie_le > CURRENT_TIMESTAMP + (%s * INTERVAL '1 second')"
+        ),
         "doublons_exacts": """SELECT COUNT(*) FROM (
             SELECT source, empreinte_contenu FROM articles_propres
             GROUP BY source, empreinte_contenu HAVING COUNT(*) > 1
@@ -41,12 +48,16 @@ def read_integrity_counts(connection) -> dict[str, int]:
     out = {}
     with connection.cursor() as cursor:
         for name, sql in checks.items():
-            cursor.execute(sql)
+            cursor.execute(
+                sql, (FUTURE_TOLERANCE.total_seconds(),) if name == "dates_futures" else None
+            )
             out[name] = int(cursor.fetchone()[0])
     return out
 
 
-def evaluate_quality(snapshot: dict, integrity: dict[str, int], *, threshold: float = REJECTION_THRESHOLD_PCT) -> dict:
+def evaluate_quality(
+    snapshot: dict, integrity: dict[str, int], *, threshold: float = REJECTION_THRESHOLD_PCT
+) -> dict:
     """Contrôles purs. Attention : les taux portent sur l'instantané, pas sur un cycle."""
     if not 0 <= threshold <= 100:
         raise ValueError("Le seuil doit être entre 0 et 100")
@@ -56,15 +67,24 @@ def evaluate_quality(snapshot: dict, integrity: dict[str, int], *, threshold: fl
             alerts.append({"code": key, "description": f"{count} anomalie(s) : {key}"})
     pending = int(snapshot["totaux"]["non_classes"])
     if pending != 0:
-        alerts.append({"code": "articles_non_classes", "description": f"{pending} article(s) brut(s) sans décision qualité"})
+        alerts.append(
+            {
+                "code": "articles_non_classes",
+                "description": f"{pending} article(s) brut(s) sans décision qualité",
+            }
+        )
     for source in snapshot["par_source"]:
         rate = source["taux_rejet_pct"]
         if rate is not None and rate > threshold:
-            alerts.append({
-                "code": "taux_rejet_excessif",
-                "source": source["source"],
-                "description": f"{source['source']} : {rate:.2f} % de rejets (seuil {threshold:g} %)",
-            })
+            alerts.append(
+                {
+                    "code": "taux_rejet_excessif",
+                    "source": source["source"],
+                    "description": (
+                        f"{source['source']} : {rate:.2f} % de rejets (seuil {threshold:g} %)"
+                    ),
+                }
+            )
     # Les flux vides (0 article) ne déclenchent pas d'alerte de rejet.
     return {
         "timestamp_utc": datetime.now(UTC).isoformat(),
@@ -99,14 +119,26 @@ def send_webhook(result: dict, url: str, provider: str) -> None:
     if provider == "slack" and parsed.hostname != "hooks.slack.com":
         raise ValueError("Webhook Slack : domaine hooks.slack.com requis")
     payload = json.dumps(make_webhook_payload(result, provider)).encode("utf-8")
-    request = Request(url, data=payload, headers={"Content-Type": "application/json", "User-Agent": "GazetteTD4/1.0"}, method="POST")
+    request = Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "GazetteTD4/1.0"},
+        method="POST",
+    )
     with urlopen(request, timeout=10) as response:
         response.read(4096)
 
 
-def run_checks(database_url: str, *, webhook_url: str | None = None, provider: str = "discord", threshold: float = REJECTION_THRESHOLD_PCT) -> dict:
+def run_checks(
+    database_url: str,
+    *,
+    webhook_url: str | None = None,
+    provider: str = "discord",
+    threshold: float = REJECTION_THRESHOLD_PCT,
+) -> dict:
     """Lire une photographie cohérente dans une transaction de lecture seule."""
     import psycopg2
+
     with closing(psycopg2.connect(database_url, connect_timeout=10)) as connection:
         connection.set_session(readonly=True, isolation_level="REPEATABLE READ")
         with connection:
@@ -117,16 +149,26 @@ def run_checks(database_url: str, *, webhook_url: str | None = None, provider: s
     if result["alertes"]:
         if webhook_url:
             send_webhook(result, webhook_url, provider)
-            LOGGER.info(json.dumps({"event": "gazette_quality_alert_sent", "number": len(result["alertes"]) }))
+            LOGGER.info(
+                json.dumps(
+                    {"event": "gazette_quality_alert_sent", "number": len(result["alertes"])}
+                )
+            )
         else:
-            LOGGER.warning("ALERTE détectée mais aucun webhook configuré : GAZETTE_ALERT_WEBHOOK_URL")
+            LOGGER.warning(
+                "ALERTE détectée mais aucun webhook configuré : GAZETTE_ALERT_WEBHOOK_URL"
+            )
     return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Contrôles qualité Gazette et alerte webhook")
     parser.add_argument("--threshold", type=float, default=REJECTION_THRESHOLD_PCT)
-    parser.add_argument("--test-alert", action="store_true", help="Simuler UNE anomalie pour vérifier le webhook sans changer PostgreSQL")
+    parser.add_argument(
+        "--test-alert",
+        action="store_true",
+        help="Simuler UNE anomalie pour vérifier le webhook sans changer PostgreSQL",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     url = os.environ.get("GAZETTE_ALERT_WEBHOOK_URL")
@@ -134,11 +176,28 @@ def main() -> None:
     if args.test_alert:
         if not url:
             parser.error("Définir GAZETTE_ALERT_WEBHOOK_URL pour tester l'envoi réel")
-        fake = {"alertes": [{"code": "test_manuel", "description": "Alerte de TEST TD4 (aucune donnée modifiée)"}]}
+        fake = {
+            "alertes": [
+                {
+                    "code": "test_manuel",
+                    "description": "Alerte de TEST TD4 (aucune donnée modifiée)",
+                }
+            ]
+        }
         send_webhook(fake, url, provider)
-        print(json.dumps({"event": "gazette_quality_test_alert_sent", "provider": provider}, ensure_ascii=False))
+        print(
+            json.dumps(
+                {"event": "gazette_quality_test_alert_sent", "provider": provider},
+                ensure_ascii=False,
+            )
+        )
         return
-    result = run_checks(os.environ["GAZETTE_DATABASE_URL"], webhook_url=url, provider=provider, threshold=args.threshold)
+    result = run_checks(
+        os.environ["GAZETTE_DATABASE_URL"],
+        webhook_url=url,
+        provider=provider,
+        threshold=args.threshold,
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if result["alertes"]:
         raise SystemExit(2)  # Les anomalies restent visibles pour Airflow en étape 7.

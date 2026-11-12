@@ -12,8 +12,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixtures-dir", type=Path, default=Path("fixtures"))
     parser.add_argument("--output", type=Path, default=Path("articles_bruts"))
-    parser.add_argument("--report", type=Path,
-                        default=Path("data/diagnostics/etape2-stockage.json"))
+    parser.add_argument(
+        "--report", type=Path, default=Path("data/diagnostics/etape2-stockage.json")
+    )
     args = parser.parse_args()
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     import psycopg2

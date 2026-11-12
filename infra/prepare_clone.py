@@ -8,7 +8,10 @@ from pathlib import Path
 
 def git(*args, cwd):
     return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True,
+        ["git", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
     ).stdout
 
 
@@ -34,14 +37,29 @@ def main():
         target.write_bytes(source.read_bytes())
     git("init", "-b", "codex/td2-livrable", cwd=snapshot)
     git("-c", "core.autocrlf=false", "add", ".", cwd=snapshot)
-    git("-c", "user.name=MDJA validation", "-c", "user.email=validation@example.invalid",
-        "commit", "-m", "Instantane local de validation du livrable", cwd=snapshot)
+    git(
+        "-c",
+        "user.name=MDJA validation",
+        "-c",
+        "user.email=validation@example.invalid",
+        "commit",
+        "-m",
+        "Instantane local de validation du livrable",
+        cwd=snapshot,
+    )
     clone = destination / "clone"
     git("clone", "--no-hardlinks", str(snapshot), str(clone), cwd=root)
     if (clone / ".env").exists() or (clone / ".venv").exists():
         raise AssertionError("Le clone ne doit pas recuperer l'environnement local")
-    print(json.dumps({"clone": str(clone), "snapshot": str(snapshot),
-                      "sha": git("rev-parse", "HEAD", cwd=clone).decode().strip()}))
+    print(
+        json.dumps(
+            {
+                "clone": str(clone),
+                "snapshot": str(snapshot),
+                "sha": git("rev-parse", "HEAD", cwd=clone).decode().strip(),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

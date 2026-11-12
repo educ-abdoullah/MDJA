@@ -26,14 +26,16 @@ def inspect_source(source_id, url, fixtures_dir=None, refresh_fixtures=False):
     try:
         with urlopen(request, timeout=30) as response:
             content = response.read(MAX_BYTES + 1)
-            result.update({
-                "http_status": response.status,
-                "final_url": response.url,
-                "content_type": response.headers.get("Content-Type"),
-                "etag": response.headers.get("ETag"),
-                "last_modified": response.headers.get("Last-Modified"),
-                "bytes_received": len(content),
-            })
+            result.update(
+                {
+                    "http_status": response.status,
+                    "final_url": response.url,
+                    "content_type": response.headers.get("Content-Type"),
+                    "etag": response.headers.get("ETag"),
+                    "last_modified": response.headers.get("Last-Modified"),
+                    "bytes_received": len(content),
+                }
+            )
         if len(content) > MAX_BYTES:
             raise ValueError("Flux superieur a 5 Mio")
         feed = feedparser.parse(content)
@@ -42,41 +44,56 @@ def inspect_source(source_id, url, fixtures_dir=None, refresh_fixtures=False):
         raw_fields = Counter(local_name(child.tag) for item in raw_items for child in item)
         qualified_fields = Counter(child.tag for item in raw_items for child in item)
         normalized_fields = (
-            "id", "title", "link", "published", "published_parsed", "updated",
-            "updated_parsed", "summary", "content", "tags",
+            "id",
+            "title",
+            "link",
+            "published",
+            "published_parsed",
+            "updated",
+            "updated_parsed",
+            "summary",
+            "content",
+            "tags",
         )
         first = feed.entries[0] if feed.entries else {}
         first_raw = raw_items[0] if raw_items else []
-        date_fields = {local_name(child.tag): child.text for child in first_raw
-                       if local_name(child.tag) in {"pubDate", "published", "updated", "date"}}
+        date_fields = {
+            local_name(child.tag): child.text
+            for child in first_raw
+            if local_name(child.tag) in {"pubDate", "published", "updated", "date"}
+        }
         parsed_date = first.get("published_parsed") or first.get("updated_parsed")
         published_utc = (
             datetime.fromtimestamp(calendar.timegm(parsed_date), UTC).isoformat()
-            if parsed_date else None
+            if parsed_date
+            else None
         )
-        result.update({
-            "feed_format": feed.version,
-            "encoding_detected": feed.get("encoding"),
-            "parser_reports_issue": bool(feed.bozo),
-            "parser_issue": str(feed.get("bozo_exception", "")),
-            "items_received": len(feed.entries),
-            "raw_item_fields_occurrences": dict(sorted(raw_fields.items())),
-            "qualified_item_fields_occurrences": dict(sorted(qualified_fields.items())),
-            "normalized_fields_present": {
-                field: sum(field in item for item in feed.entries) for field in normalized_fields
-            },
-            "first_item": {
-                "id": first.get("id"),
-                "link": first.get("link"),
-                "raw_dates": date_fields,
-                "published_utc": published_utc,
-                "title_characters": len(first.get("title", "")),
-                "summary_characters": len(first.get("summary", "")),
-                "summary_format": first.get("summary_detail", {}).get("type"),
-                "rubriques": [tag.get("term") for tag in first.get("tags", [])],
-            },
-            "usable_feed": bool(feed.version and feed.entries and not feed.bozo),
-        })
+        result.update(
+            {
+                "feed_format": feed.version,
+                "encoding_detected": feed.get("encoding"),
+                "parser_reports_issue": bool(feed.bozo),
+                "parser_issue": str(feed.get("bozo_exception", "")),
+                "items_received": len(feed.entries),
+                "raw_item_fields_occurrences": dict(sorted(raw_fields.items())),
+                "qualified_item_fields_occurrences": dict(sorted(qualified_fields.items())),
+                "normalized_fields_present": {
+                    field: sum(field in item for item in feed.entries)
+                    for field in normalized_fields
+                },
+                "first_item": {
+                    "id": first.get("id"),
+                    "link": first.get("link"),
+                    "raw_dates": date_fields,
+                    "published_utc": published_utc,
+                    "title_characters": len(first.get("title", "")),
+                    "summary_characters": len(first.get("summary", "")),
+                    "summary_format": first.get("summary_detail", {}).get("type"),
+                    "rubriques": [tag.get("term") for tag in first.get("tags", [])],
+                },
+                "usable_feed": bool(feed.version and feed.entries and not feed.bozo),
+            }
+        )
         if fixtures_dir is not None and raw_items and feed.version == "rss20" and not feed.bozo:
             # Echantillon reduit : aucun media:content, enclosure, image ou texte integral.
             sample = ElementTree.Element("rss", version="2.0")
@@ -118,8 +135,10 @@ def main():
         sources = [row for row in sources if row["source_id"] in {"lemonde", "franceinfo"}]
     report = {
         "observed_at": datetime.now(UTC).isoformat(),
-        "sources": [inspect_source(row["source_id"], row["url"], args.fixtures_dir,
-                                   args.refresh_fixtures) for row in sources],
+        "sources": [
+            inspect_source(row["source_id"], row["url"], args.fixtures_dir, args.refresh_fixtures)
+            for row in sources
+        ],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

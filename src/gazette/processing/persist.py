@@ -3,6 +3,7 @@
 Exécution manuelle idempotente pour le volume actuel (petit) ; aucun JSON brut modifié.
 La transaction garantit que les deux tables sont mises à jour ensemble.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,15 +15,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 from gazette.processing.normalize import normalize_article
 from gazette.processing.rules import filter_articles
 
 
 def content_hash(article: dict[str, Any]) -> str:
     """Empreinte des champs normalisés (source séparée dans la clé SQL)."""
-    content = json.dumps([article["titre"].casefold(), article["resume"].casefold()],
-                         ensure_ascii=False, separators=(",", ":"))
+    content = json.dumps(
+        [article["titre"].casefold(), article["resume"].casefold()],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
@@ -46,7 +49,11 @@ def read_indexed_raw(connection, raw_dir: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Chemin hors du stockage brut : {relative}")
         with path.open(encoding="utf-8") as stream:
             data = json.load(stream)
-        if not isinstance(data, dict) or (data.get("id"), data.get("source"), data.get("lien")) != (article_id.strip(), source, link):
+        if not isinstance(data, dict) or (data.get("id"), data.get("source"), data.get("lien")) != (
+            article_id.strip(),
+            source,
+            link,
+        ):
             raise ValueError(f"Index et JSON incohérents : {relative}")
         articles.append(data)
     return articles
@@ -74,26 +81,41 @@ def rebuild_quality(database_url: str, raw_dir: Path, *, now: datetime | None = 
                 cursor.execute("DELETE FROM rejets")
                 cursor.execute("DELETE FROM articles_propres")
                 for article in kept:
-                    cursor.execute("""INSERT INTO articles_propres
+                    cursor.execute(
+                        """INSERT INTO articles_propres
                         (article_brut_id, source, empreinte_contenu, titre, resume, lien,
                          publie_le, recupere_le, rubrique)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""",
-                        (article["id"], article["source"], content_hash(article),
-                         article["titre"], article["resume"], article["lien"],
-                         article["publie_le"], article["recupere_le"],
-                         json.dumps(article.get("rubrique") or [], ensure_ascii=False)))
+                        (
+                            article["id"],
+                            article["source"],
+                            content_hash(article),
+                            article["titre"],
+                            article["resume"],
+                            article["lien"],
+                            article["publie_le"],
+                            article["recupere_le"],
+                            json.dumps(article.get("rubrique") or [], ensure_ascii=False),
+                        ),
+                    )
                 for decision in rejected:
                     article = decision.article
-                    cursor.execute("""INSERT INTO rejets
+                    cursor.execute(
+                        """INSERT INTO rejets
                         (article_brut_id, source, regle_id, motif)
                         VALUES (%s,%s,%s,%s)""",
-                        (article["id"], article["source"], decision.rule_id, decision.reason))
+                        (article["id"], article["source"], decision.rule_id, decision.reason),
+                    )
             conn.commit()
         except Exception:
             conn.rollback()
             raise
-    return {"total": len(raw), "conserves": len(kept), "rejetes": len(rejected),
-            "par_regle": dict(sorted(Counter(d.rule_id for d in rejected).items()))}
+    return {
+        "total": len(raw),
+        "conserves": len(kept),
+        "rejetes": len(rejected),
+        "par_regle": dict(sorted(Counter(d.rule_id for d in rejected).items())),
+    }
 
 
 if __name__ == "__main__":

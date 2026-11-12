@@ -39,16 +39,24 @@ def read_catalogue(path: Path) -> list[dict]:
                 raise ValueError(f"Identifiant invalide ou duplique : {source_id}")
             if not name:
                 raise ValueError(f"Nom manquant : {source_id}")
-            if active and (urlparse(url).scheme not in {"http", "https"}
-                           or not urlparse(url).hostname):
+            if active and (
+                urlparse(url).scheme not in {"http", "https"} or not urlparse(url).hostname
+            ):
                 raise ValueError(f"URL HTTP(S) requise : {source_id}")
             seen.add(source_id)
-            sources.append({
-                "source_id": source_id, "name": name, "url": url, "active": active,
-                "type": row.get("type", ""), "region": row.get("region", ""),
-                "access": row.get("acces", row.get("site_url", "")),
-                "conditions": row.get("conditions", ""), "notes": row.get("notes", ""),
-            })
+            sources.append(
+                {
+                    "source_id": source_id,
+                    "name": name,
+                    "url": url,
+                    "active": active,
+                    "type": row.get("type", ""),
+                    "region": row.get("region", ""),
+                    "access": row.get("acces", row.get("site_url", "")),
+                    "conditions": row.get("conditions", ""),
+                    "notes": row.get("notes", ""),
+                }
+            )
     if not sources:
         raise ValueError("Catalogue vide")
     return sources

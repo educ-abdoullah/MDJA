@@ -1,15 +1,27 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from gazette.processing.quality_checks import (
-    evaluate_quality, make_webhook_payload, read_integrity_counts, run_checks, send_webhook
+    evaluate_quality,
+    make_webhook_payload,
+    read_integrity_counts,
+    send_webhook,
 )
 
 
 def snapshot(rate=10, pending=0):
     return {
-        "totaux": {"entres": 10, "gardes": 9-pending, "rejetes": 1, "non_classes": pending},
-        "par_source": [{"source": "lemonde", "entres": 10, "gardes": 9-pending, "rejetes": 1,
-                        "taux_rejet_pct": rate, "non_classes": pending}],
+        "totaux": {"entres": 10, "gardes": 9 - pending, "rejetes": 1, "non_classes": pending},
+        "par_source": [
+            {
+                "source": "lemonde",
+                "entres": 10,
+                "gardes": 9 - pending,
+                "rejetes": 1,
+                "taux_rejet_pct": rate,
+                "non_classes": pending,
+            }
+        ],
         "par_regle": {"R04_jeux_concours": 1},
     }
 
@@ -27,7 +39,9 @@ class QualityTests(unittest.TestCase):
 
     def test_integrity_and_pending(self):
         result = evaluate_quality(snapshot(pending=2), {"titres_vides": 1})
-        self.assertEqual({x["code"] for x in result["alertes"]}, {"titres_vides", "articles_non_classes"})
+        self.assertEqual(
+            {x["code"] for x in result["alertes"]}, {"titres_vides", "articles_non_classes"}
+        )
 
     def test_empty_source(self):
         snap = snapshot()

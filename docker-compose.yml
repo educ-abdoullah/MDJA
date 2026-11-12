@@ -19,12 +19,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     PYTHONPATH: /opt/airflow/src
     GAZETTE_ROOT: /opt/airflow
+    HF_HOME: /opt/airflow/data/huggingface
+    HF_HUB_DISABLE_TELEMETRY: "1"
     GAZETTE_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
     GAZETTE_ALERT_WEBHOOK_URL: ${GAZETTE_ALERT_WEBHOOK_URL:-}
     GAZETTE_ALERT_PROVIDER: ${GAZETTE_ALERT_PROVIDER:-discord}
   volumes:
     - ./dags:/opt/airflow/dags:ro
     - ./src:/opt/airflow/src:ro
+    - ./config:/opt/airflow/config:ro
     - ./sources.csv:/opt/airflow/sources.csv:ro
     - ./plugins:/opt/airflow/plugins:ro
     - ./logs:/opt/airflow/logs
@@ -42,11 +45,14 @@ services:
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
       PYTHONPATH: /app/src
+      HF_HOME: /app/data/huggingface
+      HF_HUB_DISABLE_TELEMETRY: "1"
       GAZETTE_DATABASE_URL: postgresql://airflow:${POSTGRES_PASSWORD:?Run bin/dev.ps1 first}@postgres/gazette
       GAZETTE_ALERT_WEBHOOK_URL: ${GAZETTE_ALERT_WEBHOOK_URL:-}
       GAZETTE_ALERT_PROVIDER: ${GAZETTE_ALERT_PROVIDER:-discord}
     volumes:
       - ./sources.csv:/app/sources.csv:ro
+      - ./config:/app/config:ro
       - ./data:/app/data
       - ./articles_bruts:/app/articles_bruts
       - ./tests/fixtures:/app/fixtures:ro

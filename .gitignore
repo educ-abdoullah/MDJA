@@ -8,7 +8,9 @@ __pycache__/
 # Environnement
 .env
 .env.*
+/.env2
 !.env.example
+/PRESENTATION_TD5_PRIVE.md
 
 # Airflow
 logs/

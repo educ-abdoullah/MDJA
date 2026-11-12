@@ -20,25 +20,34 @@ def test_raw_items_keep_old_future_and_undated_items():
 
 
 def test_raw_empty_title_and_bounded_metadata_without_media_content():
-    xml = f'''<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
-    <channel><item><link>https://example.org/test</link><description>{'a' * 2100}</description>
+    xml = f"""<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel><item><link>https://example.org/test</link><description>{"a" * 2100}</description>
     <content:encoded>ARTICLE INTEGRAL INTERDIT</content:encoded>
-    <enclosure url="https://example.org/image.jpg"/></item></channel></rss>'''.encode()
+    <enclosure url="https://example.org/image.jpg"/></item></channel></rss>""".encode()
     item = parse_raw_items(xml, "lemonde", NOW)[0]
     assert item["titre"] == ""
     assert len(item["resume"]) == 2000
     assert item["payload"]["resume_tronque"] is True
     assert "ARTICLE INTEGRAL" not in str(item)
     assert "image.jpg" not in str(item)
-    assert set(item) == {"id", "source", "lien", "titre", "resume", "publie_le",
-                         "recupere_le", "rubrique", "payload"}
+    assert set(item) == {
+        "id",
+        "source",
+        "lien",
+        "titre",
+        "resume",
+        "publie_le",
+        "recupere_le",
+        "rubrique",
+        "payload",
+    }
 
 
 def test_raw_atom_and_timezone():
-    xml = b'''<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>id-1</id>
+    xml = b"""<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>id-1</id>
     <link href="https://example.org/atom"/><title>Test</title>
     <updated>2026-10-21T10:00:00+02:00</updated><summary>Extrait</summary>
-    <category term="Societe"/></entry></feed>'''
+    <category term="Societe"/></entry></feed>"""
     item = parse_raw_items(xml, "franceinfo", NOW)[0]
     assert item["publie_le"] == "2026-10-21T08:00:00+00:00"
     assert item["rubrique"] == ["Societe"]
@@ -47,14 +56,15 @@ def test_raw_atom_and_timezone():
 
 def test_source_is_part_of_identity():
     assert article_id("lemonde", "https://example.org/a") != article_id(
-        "franceinfo", "https://example.org/a",
+        "franceinfo",
+        "https://example.org/a",
     )
 
 
 def test_full_content_is_never_used_as_summary_fallback():
-    xml = b'''<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    xml = b"""<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
     <channel><item><link>https://example.org/a</link>
-    <content:encoded>ARTICLE INTEGRAL</content:encoded></item></channel></rss>'''
+    <content:encoded>ARTICLE INTEGRAL</content:encoded></item></channel></rss>"""
     item = parse_raw_items(xml, "lemonde", NOW)[0]
     assert item["resume"] == ""
     assert "ARTICLE INTEGRAL" not in str(item)

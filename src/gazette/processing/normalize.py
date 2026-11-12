@@ -20,7 +20,20 @@ _WHITESPACE = re.compile(r"\s+")
 class _TextExtractor(HTMLParser):
     """Retire les balises et ignore le contenu de script/style."""
 
-    _SEPARATORS = {"p", "div", "br", "li", "ul", "ol", "section", "article", "h1", "h2", "h3", "blockquote"}
+    _SEPARATORS = {
+        "p",
+        "div",
+        "br",
+        "li",
+        "ul",
+        "ol",
+        "section",
+        "article",
+        "h1",
+        "h2",
+        "h3",
+        "blockquote",
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -100,7 +113,11 @@ def normalize_date(value: str | datetime | None) -> str | None:
     if value is None or value == "":
         return None
     try:
-        dt = value if isinstance(value, datetime) else datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        dt = (
+            value
+            if isinstance(value, datetime)
+            else datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        )
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC).isoformat()
@@ -108,7 +125,9 @@ def normalize_date(value: str | datetime | None) -> str | None:
         return None
 
 
-def normalize_article(article: dict[str, Any], max_excerpt_length: int = MAX_EXCERPT_LENGTH) -> dict[str, Any]:
+def normalize_article(
+    article: dict[str, Any], max_excerpt_length: int = MAX_EXCERPT_LENGTH
+) -> dict[str, Any]:
     """Renvoie une copie normalisée sans toucher à l'article d'origine.
 
     Préserve id, source, lien, payload, rubriques brutes en dehors du nettoyage
@@ -121,16 +140,20 @@ def normalize_article(article: dict[str, Any], max_excerpt_length: int = MAX_EXC
     if isinstance(raw_categories, str):
         raw_categories = [raw_categories]
     categories = [normalize_text(c) for c in raw_categories]
-    result.update({
-        "titre": title,
-        "resume": excerpt,
-        "rubrique": [c for c in categories if c],
-        "publie_le": normalize_date(article.get("publie_le")),
-        "recupere_le": normalize_date(article.get("recupere_le")),
-        "normalisation": {
-            "encodage_suspect": has_broken_encoding(title + " " + excerpt),
-            "date_publication_invalide": bool(article.get("publie_le")) and normalize_date(article.get("publie_le")) is None,
-            "date_recuperation_invalide": bool(article.get("recupere_le")) and normalize_date(article.get("recupere_le")) is None,
-        },
-    })
+    result.update(
+        {
+            "titre": title,
+            "resume": excerpt,
+            "rubrique": [c for c in categories if c],
+            "publie_le": normalize_date(article.get("publie_le")),
+            "recupere_le": normalize_date(article.get("recupere_le")),
+            "normalisation": {
+                "encodage_suspect": has_broken_encoding(title + " " + excerpt),
+                "date_publication_invalide": bool(article.get("publie_le"))
+                and normalize_date(article.get("publie_le")) is None,
+                "date_recuperation_invalide": bool(article.get("recupere_le"))
+                and normalize_date(article.get("recupere_le")) is None,
+            },
+        }
+    )
     return result

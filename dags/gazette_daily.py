@@ -6,19 +6,21 @@ from datetime import timedelta
 from pathlib import Path
 
 import pendulum
-from airflow.sdk import dag, task
+from airflow.sdk import dag, get_current_context, task
 
 
 @dag(
     dag_id="gazette_daily",
-    description="RSS -> stockage brut -> articles propres/rejets -> rapport -> contrôles et alertes",
+    description=(
+        "RSS -> stockage brut -> articles propres/rejets -> rapport -> contrôles et alertes"
+    ),
     schedule="*/30 * * * *",
     start_date=pendulum.datetime(2026, 10, 21, tz="Europe/Paris"),
     catchup=False,
     max_active_runs=1,
-    dagrun_timeout=timedelta(minutes=29),
+    dagrun_timeout=timedelta(minutes=40),
     default_args={"retries": 0},
-    tags=["mdja", "rss", "qualite", "td4"],
+    tags=["mdja", "rss", "qualite", "td4", "mlops", "td5"],
 )
 def gazette_daily():
     @task(execution_timeout=timedelta(minutes=19))
@@ -51,9 +53,7 @@ def gazette_daily():
         from gazette.processing.persist import rebuild_quality
 
         root = Path(os.environ.get("GAZETTE_ROOT", "/opt/airflow"))
-        result = rebuild_quality(
-            os.environ["GAZETTE_DATABASE_URL"], root / "articles_bruts"
-        )
+        result = rebuild_quality(os.environ["GAZETTE_DATABASE_URL"], root / "articles_bruts")
         print(json.dumps({"event": "gazette_quality_processed", **result}, ensure_ascii=False))
         return result
 
@@ -62,18 +62,27 @@ def gazette_daily():
         from contextlib import closing
 
         import psycopg2
+
         from gazette.processing.report import collect_quality_snapshot, write_report
 
         root = Path(os.environ.get("GAZETTE_ROOT", "/opt/airflow"))
-        with closing(psycopg2.connect(os.environ["GAZETTE_DATABASE_URL"], connect_timeout=10)) as connection:
+        with closing(
+            psycopg2.connect(os.environ["GAZETTE_DATABASE_URL"], connect_timeout=10)
+        ) as connection:
             snapshot = collect_quality_snapshot(connection)
+        snapshot["run_id"] = get_current_context()["run_id"]
         report_path = write_report(snapshot, root / "rapports")
-        print(json.dumps({
-            "event": "gazette_quality_report",
-            "path": str(report_path),
-            "totals": snapshot["totaux"],
-            "top_5_rejets": snapshot["top_5_rejets"],
-        }, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "event": "gazette_quality_report",
+                    "path": str(report_path),
+                    "totals": snapshot["totaux"],
+                    "top_5_rejets": snapshot["top_5_rejets"],
+                },
+                ensure_ascii=False,
+            )
+        )
         return str(report_path)
 
     @task(execution_timeout=timedelta(minutes=2))
@@ -92,11 +101,28 @@ def gazette_daily():
             raise ValueError(f"Contrôles qualité en échec : {len(result['alertes'])} alerte(s)")
         return {"statut": result["statut"], "alertes": 0}
 
+    @task(execution_timeout=timedelta(minutes=10))
+    def cluster_themes():
+        from gazette.mlops.pipeline import run_pipeline
+
+        root = Path(os.environ.get("GAZETTE_ROOT", "/opt/airflow"))
+        context = get_current_context()
+        result = run_pipeline(
+            os.environ["GAZETTE_DATABASE_URL"],
+            root / "config/clustering.yaml",
+            root / "data/mlops",
+            cutoff=context["data_interval_end"],
+            airflow_run_id=context["run_id"],
+        )
+        print(json.dumps({"event": "gazette_mlops_run", **result}, ensure_ascii=False))
+        return {"run_id": result["run_id"], "metrics": result["metrics"]}
+
     collecte = collect_rss()
     qualite = process_quality()
     rapport = generate_quality_report()
     controle = check_quality()
-    collecte >> qualite >> rapport >> controle
+    themes = cluster_themes()
+    collecte >> qualite >> rapport >> controle >> themes
 
 
 gazette_daily()

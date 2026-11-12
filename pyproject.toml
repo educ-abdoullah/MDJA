@@ -9,6 +9,12 @@ description = "Collecte RSS quotidienne orchestree par Apache Airflow"
 requires-python = ">=3.12"
 dependencies = ["feedparser==6.0.11", "psycopg2-binary==2.9.13"]
 
+[project.optional-dependencies]
+ml = [
+    "numpy==2.5.3", "scikit-learn==1.9.1", "PyYAML==6.0.3",
+    "onnxruntime==1.31.1", "tokenizers==0.23.2", "huggingface-hub==1.31.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

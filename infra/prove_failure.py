@@ -23,8 +23,11 @@ def main():
     try:
         fixture.write_bytes(broken)
         result = subprocess.run(
-            [sys.executable, "infra/check.py"], cwd=clone,
-            capture_output=True, text=True, check=False,
+            [sys.executable, "infra/check.py"],
+            cwd=clone,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         (clone.parent / "red.log").write_text(result.stdout + result.stderr, encoding="utf-8")
         results["red"] = result.returncode
@@ -33,8 +36,11 @@ def main():
     finally:
         fixture.write_bytes(original)
     result = subprocess.run(
-        [sys.executable, "infra/check.py"], cwd=clone,
-        capture_output=True, text=True, check=False,
+        [sys.executable, "infra/check.py"],
+        cwd=clone,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     (clone.parent / "green.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     results["green"] = result.returncode

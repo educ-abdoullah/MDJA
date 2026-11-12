@@ -33,3 +33,17 @@ Une autre équipe clone le dépôt et suit les deux commandes du README sur sa m
 Elle remplit `docs/Archive/revue-croisee.md` : système, commit, commandes, fichier JSON obtenu,
 résultat des tests et premier bug rencontré. Nous faisons la même vérification sur
 son dépôt. Cette validation humaine complète les tests automatiques.
+
+
+## TD5
+
+Installer aussi les dépendances ML via `requirements-dev.txt` (qui inclut la chaîne
+requirements.txt → requirements-ml.txt), ou utiliser les images Docker.
+Modifier les paramètres dans `config/clustering.yaml` et conserver le modèle à une
+révision de commit immuable. Ne pas changer une migration déjà appliquée.
+Les tests de cache et de suivi utilisent un encodeur contrôlé et PostgreSQL en schémas
+isolés. Le modèle réel est testé séparément par `bin/verify_mlops.py` sur dix articles
+propres récents ; conserver son journal comme preuve sans imposer de réseau à la CI.
+Ne pas committer le modèle, les données, les vecteurs ou les secrets.
+Documenter dans `docs/mlops.md` chaque observation éditoriale et comparer des runs
+sur les mêmes instantanés avant d'attribuer un effet aux paramètres.

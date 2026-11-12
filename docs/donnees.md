@@ -174,3 +174,51 @@ unitaires restent exécutables hors base. La CI lance aussi la suite avec Postgr
 - Import du DAG et lecture des huit sources vérifiés dans l'image Airflow.
 - Les deux flux inaccessibles restent au catalogue sans article fabriqué.
 - Les compteurs de sources sont initialisés, pas encore alimentés automatiquement.
+
+
+## Contrat TD4 — mise à jour du 12 novembre 2026
+
+Cette section actualise les états historiques ci-dessus : le collecteur multi-sources
+alimente désormais les JSON bruts ; le DAG enchaîne le traitement qualité toutes les 30 min.
+La migration 002 crée `articles_propres` et `rejets`, tous deux référencés par
+`article_brut_id` vers `articles_bruts_index`. Les propres portent source, empreinte
+du contenu, titre, résumé (500 caractères), lien, dates UTC, rubriques et date de traitement.
+Les rejets portent source, règle, motif et date de traitement. Un recalcul transactionnel
+remplace les décisions courantes et préserve les bruts. Les dates absentes restent nulles ;
+le TD5 sélectionne explicitement les publications des dernières 24 heures.
+
+### Rétention retenue
+
+- Bruts et décisions associées : 90 jours après `recupere_le`.
+- Rapports qualité : 90 jours ; conserver les preuves nécessaires au rendu jusqu'à son évaluation.
+- Éditions futures : 30 jours en stockage courant, puis archive froide jusqu'à un an,
+  puis suppression. Aucune édition n'est encore produite et aucun stockage froid n'est configuré.
+- Ces durées constituent la politique écrite ; aucune purge automatique n'est activée.
+  Avant sa mise en place, supprimer décisions et index liés dans l'ordre des clés étrangères,
+  puis fichiers, avec sauvegarde et contrôle de cohérence. Les affectations TD5 référencent des instantanés par run et les bruts,
+  ce qui préserve leur historique lors du recalcul des propres.
+
+Seules les métadonnées nécessaires sont stockées, sans téléchargement du texte intégral,
+des médias ou des commentaires et sans extraction de coordonnées personnelles.
+Les restrictions de chaque éditeur du catalogue demeurent applicables à toute republication.
+
+
+## Contrat TD5 — MLOps
+
+Migration 003 : `runs`, `embeddings`, `run_articles`, `themes`, `articles_themes`.
+Le détail des champs est dans [mlops.md](mlops.md). Les vecteurs sont des listes JSONB
+de 384 nombres finis, normalisés L2, mises en cache par texte/modèle/révision/prétraitement.
+Le volume de quelques centaines d'articles ne nécessite pas pgvector pour ce traitement CPU.
+
+Le champ `themes.run_id` identifie l'expérience productrice. Les affectations ont un
+label NULL pour le bruit, sinon une clé étrangère vers le thème du même run.
+Chaque affectation référence aussi `run_articles`, qui conserve le titre, le résumé,
+la source, le lien et les dates exactes utilisés ; il pointe vers l'index brut, sans
+clé étrangère vers `articles_propres`, dont les décisions peuvent être recalculées.
+Une reprise d'un run Airflow déjà réussi réutilise le résultat ; un rejeu explicite
+crée une nouvelle expérience. Les échecs restent dans `runs` et ne sont pas publiés.
+
+Politique : conserver 90 jours les runs, instantanés et artefacts MLOps. Coordonner
+leur suppression avec celle des bruts ; les caches sont recalculables et purgeables
+séparément. Aucune purge automatique n'est installée. Les vecteurs ne sont pas
+des textes anonymisés : mêmes règles d'accès que les métadonnées d'origine.

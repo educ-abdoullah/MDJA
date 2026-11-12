@@ -1,17 +1,25 @@
 """Tests unitaires purs de la normalisation du TD 4."""
+
 import unittest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 from gazette.processing.normalize import (
-    has_broken_encoding, normalize_article, normalize_date,
-    normalize_excerpt, normalize_spaces, normalize_text,
-    repair_encoding, strip_html,
+    has_broken_encoding,
+    normalize_article,
+    normalize_date,
+    normalize_excerpt,
+    normalize_spaces,
+    normalize_text,
+    repair_encoding,
+    strip_html,
 )
 
 
 class NormalizeTests(unittest.TestCase):
     def test_strip_html_and_entities(self):
-        self.assertEqual(strip_html("<p>Bonjour&nbsp;<b>Paris</b></p><p>Suite</p>"), " Bonjour\xa0Paris  Suite ")
+        self.assertEqual(
+            strip_html("<p>Bonjour&nbsp;<b>Paris</b></p><p>Suite</p>"), " Bonjour\xa0Paris  Suite "
+        )
 
     def test_ignores_script(self):
         self.assertEqual(normalize_text("<p>Info</p><script>secret()</script>"), "Info")
@@ -20,7 +28,9 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(normalize_spaces(" bon\u00a0  jour\n\tParis\u202f! "), "bon jour Paris !")
 
     def test_normalize_text(self):
-        self.assertEqual(normalize_text("<p>L&#39;actualité&nbsp;du jour</p>"), "L'actualité du jour")
+        self.assertEqual(
+            normalize_text("<p>L&#39;actualité&nbsp;du jour</p>"), "L'actualité du jour"
+        )
 
     def test_repair_encoding(self):
         self.assertEqual(repair_encoding("ActualitÃ©"), "Actualité")
@@ -45,10 +55,15 @@ class NormalizeTests(unittest.TestCase):
 
     def test_normalize_article_preserves_original(self):
         source = {
-            "id": "abc", "source": "lemonde", "lien": "https://example.org/a",
-            "titre": " <b>Bonjour&nbsp;Paris</b> ", "resume": "<p>Résumé</p>",
-            "rubrique": ["&Eacute;conomie"], "publie_le": "invalide",
-            "recupere_le": "2026-11-12T09:30:00Z", "payload": {"guid_ou_id": "1"},
+            "id": "abc",
+            "source": "lemonde",
+            "lien": "https://example.org/a",
+            "titre": " <b>Bonjour&nbsp;Paris</b> ",
+            "resume": "<p>Résumé</p>",
+            "rubrique": ["&Eacute;conomie"],
+            "publie_le": "invalide",
+            "recupere_le": "2026-11-12T09:30:00Z",
+            "payload": {"guid_ou_id": "1"},
         }
         result = normalize_article(source)
         self.assertEqual(result["titre"], "Bonjour Paris")

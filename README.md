@@ -5,9 +5,14 @@ tags: []
 
 # La Gazette MDJA
 
-Premier livrable : lire une source RSS, filtrer ses métadonnées et produire du JSON.
-Le collecteur fonctionne seul dans une petite image Docker ; Airflow 3.3.2 orchestre
-sa collecte quotidienne à 6 h Europe/Paris. PostgreSQL conserve les métadonnées Airflow.
+**Démonstration visuelle Windows :** double-cliquer sur `VOIR_PIPELINE.cmd`.
+Choisir lecture seule ou exécution complète, puis avancer avec Entrée.
+Voir [la visite de A à Z](docs/verification-visuelle.md).
+
+Pipeline RSS multi-sources : collecte brute, nettoyage, contrôles qualité et thèmes.
+Airflow 3.3.2 orchestre les cinq étapes toutes les 30 minutes. PostgreSQL conserve
+l'état métier, les décisions et les expériences MLOps. Les embeddings multilingues
+sont calculés localement sur CPU avec ONNX ; HDBSCAN trouve les thèmes et le bruit.
 
 ## Cloner et lancer en deux commandes
 
@@ -83,7 +88,7 @@ Le diagnostic du 21 octobre constate six flux lisibles, une boucle de redirectio
 pour Sud Ouest et un refus 403 pour Le Télégramme. Les URL demandées sont conservées.
 Les conditions conservées sont des notes de l'équipe, pas une validation juridique.
 
-Le parseur garde les titres/liens datés de moins de 24 h à la collecte, rejette les
+La commande historique `app` garde les titres/liens datés de moins de 24 h, rejette les
 dates futures et les doublons d'URL dans un flux. Il ne télécharge pas les articles
 intégraux. Timeout réseau : 30 s ; taille maximale : 5 Mio. Une reprise du même run
 remplace atomiquement son archive ; un nouveau run conserve une autre archive.
@@ -99,8 +104,7 @@ docker compose run --rm --no-deps app
 Le démarrage initialise aussi la base métier `gazette`, distincte de `airflow`, avec
 une table `sources` et un index unique `(source, lien)`. Le nouveau stockage produit
 un JSON par article sous `articles_bruts/`, sans filtre de fraîcheur. Il conserve
-les métadonnées bornées, pas le texte intégral. Le raccordement du collecteur à ce
-stockage et le cycle de 30 minutes restent les prochaines étapes.
+les métadonnées bornées, pas le texte intégral. Le collecteur multi-sources est raccordé à ce stockage dans le DAG toutes les 30 minutes.
 
 ```powershell
 docker compose run --rm gazette-init
@@ -115,10 +119,11 @@ Les champs, migrations, reprises après interruption et limites sont expliqués 
 
 ## Images et CI
 
-Le DAG prévoit au maximum 12 tentatives par tâche : la première, 3 retries sans délai
-volontaire, puis jusqu'à 8 retries espacés de 30 minutes. Chaque tentative est limitée
-à 3 minutes et le DAG à 10 h, pour laisser les deux étapes successives utiliser leurs
-reprises. Un succès arrête les retries ; les logs indiquent le numéro et le délai choisi.
+Les retries Airflow sont désactivés. Le collecteur fait au plus trois tentatives
+sur erreur transitoire, espacées de 1 et 2 secondes, puis compte un seul cycle échoué.
+Trois cycles échoués mettent la source en sommeil. Les erreurs permanentes ne sont
+pas retentées dans le cycle. MLOps démarre après les contrôles qualité et est limité
+à dix minutes ; le DAG complet à quarante minutes, avec un seul run actif.
 
 Le `Dockerfile` principal contient les étapes `dependencies`, `runtime`, `test`, `app`.
 L'image finale ne contient ni Airflow, ni les outils de tests, ni les fichiers de build.
@@ -138,7 +143,7 @@ Les résultats effectifs et les liens de preuve sont consignés dans `docs/Archi
 `docker compose stop` arrête les services ; `docker compose down` retire les conteneurs
 en conservant les volumes. Garder `.env` et les volumes pour conserver la base et
 les identifiants. Données et logs restent hors Git. Le poste et Docker doivent rester
-actifs pour les exécutions quotidiennes. `GAZETTE_SKIP_COLLECT=1` permet à la CI de
+actifs pour les exécutions planifiées. `GAZETTE_SKIP_COLLECT=1` permet à la CI de
 vérifier la stack sans joindre les médias.
 
 Voir [CONTRIBUTING.md](CONTRIBUTING.md), [stratégie CI/CD](docs/Archive/ci-cd.md),
@@ -146,5 +151,32 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md), [stratégie CI/CD](docs/Archive/ci-cd.m
 [journal](docs/Archive/journal.md), [données](docs/donnees.md)
 et [fiche de revue croisée](docs/Archive/revue-croisee.md).
 
-Le raccordement de la collecte au stockage brut, les reprises par source, le cycle
-de 30 minutes, les thèmes, synthèses et publication à 7 h restent les étapes suivantes.
+La suite porte sur l’évaluation des thèmes au TD6, puis les synthèses et la publication.
+
+
+## TD4 — chaîne qualité actuelle
+
+Le DAG `gazette_daily` lance toutes les 30 minutes : collecte multi-sources,
+`process_quality`, `generate_quality_report`, puis `check_quality`.
+Les retries Airflow sont désactivés ; le collecteur reprend les erreurs transitoires
+au plus trois fois, avec attentes de 1 et 2 secondes, et met une source en sommeil
+après trois cycles échoués. Les propres/rejets sont recalculés depuis les bruts.
+Les rapports sont persistés sous `rapports/`, les métriques dans les logs Airflow.
+
+Vérifications : `docker compose run --rm --build storage-tests`.
+Voir [règles](docs/qualite.md), [contrat](docs/donnees.md) et
+[validation TD4](docs/validation-td4.md). Le webhook d'alerte reste dans `.env`.
+
+
+## TD5 — thèmes et traçabilité MLOps
+
+`cluster_themes` suit `check_quality` dans le DAG. Il sélectionne les publications
+des dernières 24 h, met les embeddings en cache, calcule les thèmes et conserve
+les articles isolés. Chaque expérience est stockée dans `runs`, avec paramètres,
+versions, métriques et artefacts sous `data/mlops/<uuid>/`.
+
+Configuration : [config/clustering.yaml](config/clustering.yaml).
+Explications, thèmes du jour, comparaisons et requêtes : [docs/mlops.md](docs/mlops.md).
+Le téléchargement initial du modèle nécessite Internet ; les textes sont traités sur CPU.
+L'image comprend les dépendances ML et est plus volumineuse que le premier collecteur RSS.
+La CI teste le code sans télécharger le modèle ; la validation du vrai modèle est documentée.
